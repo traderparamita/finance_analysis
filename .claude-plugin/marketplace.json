@@ -11,7 +11,10 @@
   "plugins": [
     {
       "name": "finance-analysis",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "traderparamita/finance_analysis"
+      },
       "version": "1.0.0",
       "description": "투자 분석 보고서 자동 생성 플러그인 — yfinance 실시간 재무 + WebSearch 이슈 + 15개 표준 차트 + ReportLab PDF"
     }

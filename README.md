@@ -16,54 +16,76 @@ Claude Code 플러그인 — 투자 분석 보고서 자동 생성기.
 - macOS / Linux / Windows (한글 폰트 자동 fallback)
 - Python 3.10+
 - Claude Code CLI 또는 IDE 확장
-- (선택) GitHub CLI `gh` — 자동 업데이트 워크플로우 편의용
 
-### 1) Repo clone + Python 환경 셋업
+---
+
+## 설치 — 수동 방식 (권장, 모든 Claude Code 버전에서 동작)
+
+### macOS / Linux
+
 ```bash
+# 1) Repo clone
 git clone https://github.com/traderparamita/finance_analysis.git ~/finance-reports
 cd ~/finance-reports
-./bootstrap.sh    # Python 3.10+ 점검 → .venv 생성 → 의존성 설치 → 폰트 점검
-```
 
-`bootstrap.sh`가 자동 처리하지 못하면 수동으로:
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-```
+# 2) Python 환경 + 폰트 점검 자동화
+./bootstrap.sh
+# bootstrap.sh가 안 돌면 수동: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
-### 2) Claude Code에 스킬 등록 (심볼릭 링크 권장)
-
-`~/.claude/skills/`에 심볼릭 링크를 걸면 `git pull` 시 자동으로 최신 버전이 반영됩니다.
-
-```bash
+# 3) Claude Code 스킬 등록 (심볼릭 링크 — git pull 시 자동 업데이트)
 mkdir -p ~/.claude/skills
 ln -sf ~/finance-reports/skills/finance-report ~/.claude/skills/finance-report
 ln -sf ~/finance-reports/skills/finance-brief  ~/.claude/skills/finance-brief
-
-# 확인
-ls -la ~/.claude/skills/
 ```
 
-심볼릭 링크 대신 복사 방식을 원하면:
-```bash
-cp -r ~/finance-reports/skills/finance-report ~/.claude/skills/
-cp -r ~/finance-reports/skills/finance-brief  ~/.claude/skills/
+### Windows
+
+```bat
+:: 1) Repo clone
+git clone https://github.com/traderparamita/finance_analysis.git %USERPROFILE%\finance-reports
+cd %USERPROFILE%\finance-reports
+
+:: 2) Python 환경 (PowerShell 기준)
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+
+:: 3) Claude Code 스킬 등록 (관리자 권한 cmd에서 mklink 권장)
+mklink /D %USERPROFILE%\.claude\skills\finance-report %USERPROFILE%\finance-reports\skills\finance-report
+mklink /D %USERPROFILE%\.claude\skills\finance-brief  %USERPROFILE%\finance-reports\skills\finance-brief
+
+:: mklink 권한 문제면 단순 복사:
+xcopy /E /I /Y %USERPROFILE%\finance-reports\skills\finance-report %USERPROFILE%\.claude\skills\finance-report
+xcopy /E /I /Y %USERPROFILE%\finance-reports\skills\finance-brief  %USERPROFILE%\.claude\skills\finance-brief
 ```
 
-### 3) 스킬 활성화 확인
-Claude Code를 재시작한 후, 슬래시 명령어로 호출:
+### 확인
+
+Claude Code를 재시작한 후 슬래시 명령어로 호출:
 ```
 /finance-report 펨트론    # 풀 보고서
 /finance-brief 펨트론      # 압축 브리프
 ```
 
-명령어가 안 보이면 `/commands` 또는 `/help`로 확인하세요. Claude Code가 `~/.claude/skills/` 아래 SKILL.md를 자동 인식합니다.
+명령어가 안 보이면 `/commands`로 등록된 스킬을 확인. Claude Code가 `~/.claude/skills/` 아래 SKILL.md를 자동 인식합니다.
 
 ### 업데이트
 ```bash
 cd ~/finance-reports && git pull
-# 심볼릭 링크 방식이면 끝, 복사 방식이면 위 2)단계 cp 명령 다시 실행
+# 심볼릭 링크 방식이면 자동 반영, 복사 방식이면 위 3)단계 다시 실행
 ```
+
+---
+
+## 설치 — Claude Code 플러그인 방식 (실험적)
+
+> ⚠️ Claude Code 버전에 따라 동작하지 않을 수 있습니다. 실패하면 위의 수동 설치를 사용하세요.
+
+```
+/plugin marketplace add traderparamita/finance_analysis
+/plugin install finance-analysis@traderparamita-finance
+```
+
+`source type your Claude Code version does not support` 에러가 나면 Claude Code를 최신 버전으로 업데이트한 뒤 다시 시도하거나, 수동 설치로 대체.
 
 ---
 
