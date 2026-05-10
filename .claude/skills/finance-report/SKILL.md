@@ -5,7 +5,7 @@ argument-hint: "종목명 또는 '삼성전자 분석 보고서 만들어줘'"
 license: MIT
 metadata:
   author: lifesailor
-  version: "4.0.0"
+  version: "4.1.0"
 ---
 
 # 투자 분석 보고서 생성 스킬
@@ -66,10 +66,14 @@ metadata:
 
 티커를 확보하는 즉시, **파일을 단 한 줄도 작성하기 전에** 아래 Bash를 실행한다. v4.0부터는 분기·Forward·뉴스까지 한 번에 가져오는 `fetch_full_enrichment()`를 사용한다.
 
+> **Note**: 아래 명령어는 **현재 작업 디렉토리(cwd)가 finance-analysis 프로젝트 루트**라고 가정한다. Claude Code가 다른 디렉토리에서 실행 중이면 `cd $FINANCE_REPORTS_DIR` 또는 프로젝트 루트로 이동 후 실행한다.
+
 ```bash
-cd /Users/lifesailor/Desktop/kosmos/ai/investment/finance_analysis
-.venv/bin/python - <<'EOF'
-import sys; sys.path.insert(0, '.')
+# python3 명령이 가능하면 그대로, 가상환경이 있다면 .venv/bin/python 사용
+python3 - <<'EOF'
+import sys, os
+# 프로젝트 루트(=run.py가 있는 디렉토리)를 sys.path에 추가
+sys.path.insert(0, os.getcwd())
 from shared.data_fetcher import fetch_full_enrichment
 import json
 data = fetch_full_enrichment('{{TICKER}}')
@@ -118,25 +122,28 @@ API로 가져올 수 없는 항목만 질문한다. **한 번에 모두 질문**
 
 `fetch_full_enrichment()`가 분기·Forward·뉴스를 자동으로 가져왔다면, 이제 **현재 가장 이슈가 되는 사안**을 외부 검색으로 보강한다. 이 단계가 보고서의 "지금 이 종목에 무슨 일이 벌어지고 있는가"를 결정한다.
 
-### 1) WebSearch — 핵심 이슈 발굴
+### 1) WebSearch — 핵심 이슈 + 창업자 발굴
 
-다음 4개 쿼리를 모두 실행한다 (영문 종목은 영문 쿼리도 병행):
+다음 5개 쿼리를 모두 실행한다 (영문 종목은 영문 쿼리도 병행):
 
 ```
 1. "{종목명} {티커} latest earnings 2026"           # 최근 실적/가이던스
 2. "{종목명} {티커} news lawsuit regulation"         # 소송·규제 이슈
 3. "{종목명} {티커} M&A acquisition partnership"    # 사업 변화
 4. "{종목명} 주가 전망 분석"  (한국어 — 국내 시각도 확인)
+5. "{종목명} 창업자 {founder_name} 인터뷰 자서전 창업 스토리" (★ v4.1) — 창업 배경/철학
 ```
+
+5번 쿼리는 창업자 이름을 모르는 경우 "{종목명} founder history origin story"로 영문 검색하여 창업자 이름부터 확보한 뒤 후속 검색을 진행한다.
 
 각 검색 결과 상위 3~5개 중 **임팩트가 큰 3~5건**을 선별한다. 선별 기준:
 - 보고일 기준 30~90일 이내 발생
 - 실적·가이던스 발표, 주요 임원 변경, 대형 M&A, 소송·규제, 신제품 출시
 - 단순 가격 변동 코멘트는 제외
 
-### 2) WebFetch — 본문 인용
+### 2) WebFetch — 본문 인용 (이슈 + 창업자)
 
-선별된 3~5건 각각에 대해 WebFetch로 원문 기사를 가져와 **핵심 문장 1~2개를 직접 인용**한다. 인용 시 출처(언론사명)와 보도 날짜를 반드시 함께 기록한다.
+선별된 핵심 이슈 3~5건과 **창업자 인터뷰·자서전 1~2건** 각각에 대해 WebFetch로 원문을 가져와 **핵심 문장 1~2개를 직접 인용**한다. 인용 시 출처(언론사명·서적명)와 보도 날짜를 반드시 함께 기록한다.
 
 ```
 WebFetch 프롬프트 예시:
@@ -264,6 +271,26 @@ CONFIG = {
     # ── 투자매력도 레이더 ──
     'radar_categories': ['수익성', '성장성', '안정성', '밸류에이션', '섹터지표1', '섹터지표2'],
     'radar_scores':     [숫자, ...],  # 10점 만점
+
+    # ── ★ v4.1 신규 — 창업자 & 창업 스토리 (선택, 없으면 섹션 자동 스킵) ──
+    'founder': {
+        'name':       '잭 도시 (Jack Dorsey)',
+        'role':       'CEO / Block Head / 공동창업자',
+        'born':       '1976년 11월, 미국 미주리 세인트루이스',
+        'background': '뉴욕대 중퇴, 2006년 Twitter 공동창업, 2009년 Square(현 Block) 창업',
+        'philosophy': '"Economic Empowerment" — 기술로 경제 시스템 접근권 확장',
+        'timeline': [
+            {'year': '2006', 'event': 'Twitter 공동창업', 'note': 'CEO 역임 후 2008년 해임'},
+            {'year': '2009', 'event': 'Square 창업', 'note': '소상공인 카드결제 단말 출시'},
+            {'year': '2013', 'event': 'Cash App 출시', 'note': 'P2P 송금으로 소비자 시장 진입'},
+            {'year': '2021', 'event': '사명 Block으로 변경', 'note': '비트코인·블록체인 비전 강조'},
+            {'year': '2025', 'event': '티커 SQ → XYZ 변경', 'note': '핀테크 슈퍼앱 정체성 재정의'},
+        ],
+        'quotes': [
+            {'text': 'AI should replace the middle manager.', 'source': 'CoinDesk 인터뷰', 'date': '2026-04-01'},
+            {'text': '...', 'source': 'WSJ', 'date': '2026-02-26'},
+        ],
+    },
 }
 ```
 
@@ -298,6 +325,7 @@ from reportlab.platypus import PageBreak
 from shared.pdf_utils import (
     build_pdf, make_table, tip_box, chart_image, hr_line, sp, make_styles,
     news_card, issue_card, quarterly_momentum_table, forward_consensus_table,
+    founder_card, founder_quote_card, founder_timeline_table,  # ★ v4.1
 )
 from stocks.{폴더명}.config import CONFIG
 
@@ -317,24 +345,25 @@ def tbl(headers, rows, widths=None):
     return make_table(headers, rows, col_widths=widths, primary_hex=PRIMARY_HEX)
 ```
 
-### PDF 섹션 순서 (v4.0 — 반드시 준수)
+### PDF 섹션 순서 (v4.1 — 반드시 준수)
 
 1. 표지
 2. 목차
 3. 기업 개요
-4. 비전 & 전략
-5. 사업 모델 분석
-6. 재무 분석 (chart1, chart7)
-7. 수익성 분석 (chart2, chart3)
-8. 성장성 분석 (chart5)
-9. 재무 안정성 (chart4)
-10. 현금흐름 분석 (chart9, chart10, chart11)
-11. 산업 & 경쟁 분석 (chart6)
-12. SWOT & 리스크 분석 (chart8)
-13. **분기 모멘텀 & 애널리스트 컨센서스 (chart13, chart14, chart15) ★ v4.0 신규**
-14. **최신 이슈 & 뉴스 브리핑 (WebSearch + WebFetch + yfinance news) ★ v4.0 신규**
-15. 밸류에이션 & 결론 (chart12)
-16. 면책 고지
+4. **창업자 & 창업 스토리 (founder_card + founder_timeline_table + founder_quote_card) ★ v4.1 신규**
+5. 비전 & 전략
+6. 사업 모델 분석
+7. 재무 분석 (chart1, chart7)
+8. 수익성 분석 (chart2, chart3)
+9. 성장성 분석 (chart5)
+10. 재무 안정성 (chart4)
+11. 현금흐름 분석 (chart9, chart10, chart11)
+12. 산업 & 경쟁 분석 (chart6)
+13. SWOT & 리스크 분석 (chart8)
+14. 분기 모멘텀 & 애널리스트 컨센서스 (chart13, chart14, chart15) ★ v4.0
+15. 최신 이슈 & 뉴스 브리핑 (WebSearch + WebFetch + yfinance news) ★ v4.0
+16. 밸류에이션 & 결론 (chart12)
+17. 면책 고지
 
 ### 섹션별 서술 기준 (품질 체크리스트)
 
@@ -347,56 +376,64 @@ def tbl(headers, rows, widths=None):
 - [ ] 최근 1~2년 중 가장 중요한 전략 변화 한 가지
 - [ ] `tip()`: 비즈니스 모델을 초보자도 이해할 수 있는 1~2문장 비유
 
-#### 4. 비전 & 전략 (표 + 서술)
+#### 4. 창업자 & 창업 스토리 (★ v4.1 신규)
+- [ ] `founder_card(CFG['founder'], STY)` 호출 — 이름·역할·출생·약력·핵심 철학
+- [ ] `founder_timeline_table(CFG['founder']['timeline'])` 호출 — 창업~성장 변곡점 3~5개 (연도/사건/맥락)
+- [ ] `founder_quote_card()` 1~2개 호출 — 인터뷰·자서전 직접 인용
+- [ ] WebSearch + WebFetch로 인용문 1차 출처를 확인 (전문 인용 시 출처·날짜 필수)
+- [ ] 창업자 정보가 부족한 경우 founder dict 비워두면 섹션 자동 스킵 (backward-compat)
+- [ ] `tip()`: "왜 창업자 이해가 투자에 중요한가" 한 줄 (예: 의사결정 스타일·리스크 성향·장기 전략 일관성)
+
+#### 5. 비전 & 전략 (표 + 서술)
 - [ ] 회사의 공식 미션/비전 문구
 - [ ] 전략 방향 3~5개를 표로 정리 (전략명 / 구체적 내용)
 - [ ] 현재 추진 중인 M&A·파트너십·신사업 중 핵심 1~2개 심층 서술
 - [ ] 해당 전략이 3~5년 뒤 재무에 미치는 기대 효과 언급
 
-#### 5. 사업 모델 분석 (chart6 + 표)
+#### 6. 사업 모델 분석 (chart6 + 표)
 - [ ] 수익 구조 한 줄 설명 (어떻게 돈을 버는가)
 - [ ] 사업부문별 매출 비중 표 (chart6와 일치)
 - [ ] 섹터 특화 지표 포함 (아래 "섹터별 핵심 지표" 참고)
 - [ ] 지역별/채널별 비중이 있으면 sub_labels로 추가
 
-#### 6. 재무 분석 (표 + chart1, chart7)
+#### 7. 재무 분석 (표 + chart1, chart7)
 - [ ] 5개년(또는 yfinance 제공 연도) 손익 테이블
 - [ ] 전년 대비 가장 큰 변화 1~2개를 굵은 글씨로 강조
 - [ ] 일회성 항목이 있으면 반드시 주석 처리 (예: "세금 환입 일회성 포함")
 - [ ] `tip()`: 매출/영업이익/순이익 3가지의 차이를 초보자용으로 설명
 
-#### 7. 수익성 분석 (chart2, chart3)
+#### 8. 수익성 분석 (chart2, chart3)
 - [ ] ROE·ROA·영업이익률 테이블
 - [ ] 동종 업계 평균 또는 경쟁사와 비교 한 문장
 - [ ] 수익성 개선/악화의 구체적 원인 서술 (비용 구조, Mix shift 등)
 
-#### 8. 성장성 분석 (chart5)
+#### 9. 성장성 분석 (chart5)
 - [ ] YoY 성장률 테이블
 - [ ] 성장 동력이 된 이벤트를 연도별로 1줄씩 서술 (예: "2024년 +41.8% — 인도 수익화 가속")
 - [ ] 향후 성장 촉매 2~3개 전망
 
-#### 9. 재무 안정성 (chart4)
+#### 10. 재무 안정성 (chart4)
 - [ ] 부채비율·유동비율 테이블
 - [ ] "이 수치가 왜 안전/위험한가"를 업종 기준으로 설명
 - [ ] 최대 위험 시나리오 한 줄 언급
 
-#### 10. 현금흐름 분석 (chart9, chart10, chart11)
+#### 11. 현금흐름 분석 (chart9, chart10, chart11)
 - [ ] OCF/ICF/FCF 테이블
 - [ ] "이익과 현금흐름의 차이"를 구체적 수치로 설명
 - [ ] CAPEX 성격 판단: 유지보수 vs 성장투자
 - [ ] `tip()`: FCF가 왜 중요한지 초보자용 설명
 
-#### 11. 산업 & 경쟁 분석 (chart6)
+#### 12. 산업 & 경쟁 분석 (chart6)
 - [ ] 경쟁사 3~4개를 표로 비교 (매출, 영업이익률, PER, 특징)
 - [ ] 섹터 특화 지표로 비교 (아래 "섹터별 핵심 지표" 참고)
 - [ ] 이 회사의 차별화 포인트 3가지 명시
 
-#### 12. SWOT & 리스크 (chart8)
+#### 13. SWOT & 리스크 (chart8)
 - [ ] 강점·약점·기회·위협 각 4~5개 (chart8과 일치)
 - [ ] 리스크 테이블: 리스크명 / 심각도(상/중상/중/낮음) / 내용 / 모니터링 포인트
 - [ ] 심각도 "상" 이상의 리스크는 반드시 하나 이상 포함
 
-#### 13. 분기 모멘텀 & 애널리스트 컨센서스 (★ v4.0 신규)
+#### 14. 분기 모멘텀 & 애널리스트 컨센서스 (★ v4.0)
 - [ ] `quarterly_momentum_table(CFG)` 호출 — 최근 8분기 매출/영업이익/순이익 테이블
 - [ ] `chart13_quarterly_momentum.png` 삽입
 - [ ] 분기별 변곡점 1~2개를 굵은 글씨로 강조 (예: "24Q3 마진 점프 — Afterpay 흑자 전환")
@@ -405,7 +442,7 @@ def tbl(headers, rows, widths=None):
 - [ ] 애널리스트 평균 목표가와 본 보고서 목표가의 차이를 1~2문장으로 비교
 - [ ] `tip()`: "왜 분기 데이터가 연간 데이터보다 빠른 신호인가" 초보자 설명
 
-#### 14. 최신 이슈 & 뉴스 브리핑 (★ v4.0 신규)
+#### 15. 최신 이슈 & 뉴스 브리핑 (★ v4.0)
 - [ ] WebSearch로 발굴 + WebFetch로 본문 인용한 핵심 이슈 3~5건을 `issue_card()`로 렌더링
 - [ ] 각 이슈마다: 헤드라인, 2~3문장 본문, 직접 인용문, 출처(언론사·날짜·URL), 심각도
 - [ ] 심각도 "상" 또는 "중상" 이슈가 최소 1건 포함 (없으면 추가 검색)
@@ -413,7 +450,7 @@ def tbl(headers, rows, widths=None):
 - [ ] 섹션 마지막에 한 줄 종합 코멘트: "최근 30~90일 핵심 변화 한 줄 요약"
 - [ ] WebSearch/WebFetch 조사 시점을 보고서에 명시 (예: "2026-05-07 조사 기준")
 
-#### 15. 밸류에이션 & 결론
+#### 16. 밸류에이션 & 결론
 - [ ] 아래 "섹터별 밸류에이션 방법론"에 따라 목표주가 계산
 - [ ] 밸류에이션 테이블 (지표명 / 현재값 / 해석)
 - [ ] radar chart (chart12)
@@ -534,11 +571,10 @@ COMPANIES = {
 
 ## Phase 3: 실행 및 완료 안내
 
-파일 생성 후 즉시 실행하여 오류 없이 완료되는지 확인한다.
+파일 생성 후 즉시 실행하여 오류 없이 완료되는지 확인한다. 현재 작업 디렉토리는 프로젝트 루트(`run.py` 있는 곳)여야 한다.
 
 ```bash
-cd /Users/lifesailor/Desktop/kosmos/ai/investment/finance_analysis
-.venv/bin/python run.py {종목명}
+python3 run.py {종목명}
 ```
 
 완료 후 사용자에게 안내:

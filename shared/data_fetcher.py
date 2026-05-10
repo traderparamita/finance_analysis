@@ -355,11 +355,74 @@ def fetch_recent_news(ticker: str, limit: int = 10) -> list[dict]:
 
 
 # ══════════════════════════════════════════════════════════
+# 가격 포지션 (52주 레인지 · 분위 · 20일 이평)
+# ══════════════════════════════════════════════════════════
+def fetch_price_position(ticker: str) -> dict:
+    """52주 고가/저가, 현재 주가의 분위, 20일 이평선 대비 위치를 반환.
+
+    finance-brief의 '52주 위치' 스냅샷 섹션에서 사용된다.
+    데이터가 부분적으로 빠져 있어도 가능한 만큼 채워서 반환.
+    """
+    print(f"  📡 {ticker} 가격 포지션 조회 중...")
+    try:
+        tk = yf.Ticker(ticker)
+        info = tk.info or {}
+
+        cur    = info.get('currentPrice') or info.get('regularMarketPrice')
+        high52 = info.get('fiftyTwoWeekHigh')
+        low52  = info.get('fiftyTwoWeekLow')
+
+        # 20일 이동평균 (close)
+        ma20 = None
+        try:
+            hist = tk.history(period='2mo')
+            if not hist.empty and 'Close' in hist.columns:
+                closes = hist['Close'].dropna()
+                if len(closes) >= 5:
+                    ma20 = float(closes.tail(20).mean())
+        except Exception:
+            pass
+
+        currency = info.get('currency', 'KRW')
+        if currency == 'KRW':
+            fmt = lambda v: f"{v:,.0f}원" if v else 'N/A'
+        else:
+            fmt = lambda v: f"${v:,.2f}" if v else 'N/A'
+
+        percentile = None
+        if cur and high52 and low52 and high52 != low52:
+            percentile = (cur - low52) / (high52 - low52) * 100
+
+        ma20_diff = None
+        if cur and ma20:
+            ma20_diff = (cur / ma20 - 1) * 100
+
+        result = {
+            'current':       cur,
+            'current_str':   fmt(cur),
+            'high_52w':      high52,
+            'low_52w':       low52,
+            'high_52w_str':  fmt(high52),
+            'low_52w_str':   fmt(low52),
+            'percentile':    percentile,
+            'ma20':          ma20,
+            'ma20_str':      fmt(ma20),
+            'ma20_diff':     ma20_diff,
+        }
+        if percentile is not None:
+            print(f"  ✅ 52주 분위 {percentile:.0f}%, 20일 이평 대비 {ma20_diff:+.1f}%" if ma20_diff is not None else f"  ✅ 52주 분위 {percentile:.0f}%")
+        return result
+    except Exception as e:
+        print(f"  ⚠️  가격 포지션 조회 실패: {e}")
+        return {}
+
+
+# ══════════════════════════════════════════════════════════
 # 통합 enrichment (한 번에 호출)
 # ══════════════════════════════════════════════════════════
 def fetch_full_enrichment(ticker: str) -> dict:
     """
-    fetch_stock_data + 분기 + Forward + 뉴스를 한 번에 호출하여 병합한 dict 반환.
+    fetch_stock_data + 분기 + Forward + 뉴스 + 가격 포지션을 한 번에 호출하여 병합한 dict 반환.
 
     config.py에 그대로 spread해서 사용하면 된다.
     """
@@ -369,9 +432,11 @@ def fetch_full_enrichment(ticker: str) -> dict:
     quarterly = fetch_quarterly_data(ticker)
     forward   = fetch_forward_estimates(ticker)
     news      = fetch_recent_news(ticker)
+    position  = fetch_price_position(ticker)
     return {
         **base,
         **quarterly,
-        'forward': forward,
-        'news':    news,
+        'forward':         forward,
+        'news':            news,
+        'price_position':  position,
     }

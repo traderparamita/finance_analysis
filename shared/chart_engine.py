@@ -12,11 +12,54 @@ shared/chart_engine.py
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 import numpy as np
 import os
+import textwrap
 
-# ── 기본 설정 ──────────────────────────────────────
-plt.rcParams['font.family'] = 'AppleGothic'
+# ── 한글 폰트 자동 감지 (cross-platform) ──────────────
+# pdf_utils.py와 동일한 후보 리스트를 사용해 일관성 유지.
+_CHART_FONT_CANDIDATES = [
+    # macOS
+    '/System/Library/Fonts/Supplemental/AppleGothic.ttf',
+    '/System/Library/Fonts/AppleGothic.ttf',
+    '/Library/Fonts/AppleSDGothicNeo.ttc',
+    # Linux
+    '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/opentype/noto-cjk/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+    '/usr/share/fonts/nanum/NanumGothic.ttf',
+    # Windows
+    'C:/Windows/Fonts/malgun.ttf',
+    'C:/Windows/Fonts/NanumGothic.ttf',
+    # 사용자 설치
+    os.path.expanduser('~/.fonts/NotoSansKR-Regular.otf'),
+    os.path.expanduser('~/.fonts/NanumGothic.ttf'),
+    os.path.expanduser('~/Library/Fonts/NotoSansKR-Regular.otf'),
+]
+
+# 환경변수 오버라이드 (최우선)
+_env_font = os.environ.get('FINANCE_KOREAN_FONT')
+if _env_font:
+    _CHART_FONT_CANDIDATES.insert(0, os.path.expanduser(_env_font))
+
+_CHART_FONT_FAMILY = None
+for _fp in _CHART_FONT_CANDIDATES:
+    if os.path.exists(_fp):
+        try:
+            font_manager.fontManager.addfont(_fp)
+            _CHART_FONT_FAMILY = font_manager.FontProperties(fname=_fp).get_name()
+            break
+        except Exception:
+            continue
+
+if _CHART_FONT_FAMILY:
+    plt.rcParams['font.family'] = _CHART_FONT_FAMILY
+else:
+    # 한글 폰트 없으면 sans-serif (한글 깨짐) — pdf_utils에서 이미 경고 발생
+    plt.rcParams['font.family'] = 'sans-serif'
+
 plt.rcParams['axes.unicode_minus'] = False
 
 FIGSIZE = (10, 5.5)
@@ -290,31 +333,71 @@ def chart7_net_income(cfg, out_dir):
 # Chart 8: SWOT 4분면
 # ══════════════════════════════════════════════════════════
 def chart8_swot(cfg, out_dir):
+    """SWOT 4분면 — v4.1 가독성 개선판.
+
+    - 큰 figsize(14×10) + DPI 150 = 2100×1500
+    - 각 사분면: 색상 헤더 띠 + 진한 테두리 + 항목 사이 여유 간격
+    - 긴 한국어 항목 자동 줄바꿈(textwrap)
+    - 4분면 명확한 거터(여백)
+    """
     c = cfg['colors']
     company = cfg['name']
     swot    = cfg['swot']  # {'강점': [...], '약점': [...], '기회': [...], '위협': [...]}
 
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    fig.suptitle(f'{company} SWOT 분석', fontsize=16, fontweight='bold', y=0.98)
+    red     = c.get('red',   '#E74C3C')
+    green   = c.get('green', '#2ECC71')
+    primary = c['primary']
+    accent  = c['accent']
 
-    red   = c.get('red',   '#E74C3C')
-    green = c.get('green', '#2ECC71')
+    # 사분면 설정: (제목, 사분면 라벨, 배경, 헤더띠, 텍스트색)
+    quadrants = [
+        ('Strengths',     '강점', '#FFF8E1', accent,  '#1A202C'),
+        ('Weaknesses',    '약점', '#FFEBEE', red,     '#1A202C'),
+        ('Opportunities', '기회', '#E8F5E9', green,   '#1A202C'),
+        ('Threats',       '위협', '#EDE7F6', primary, '#1A202C'),
+    ]
+    keys = list(swot.keys())
 
-    titles  = ['Strengths (강점)', 'Weaknesses (약점)', 'Opportunities (기회)', 'Threats (위협)']
-    bgs     = ['#FFF3E0', '#FFEBEE', '#E8F5E9', '#FFF9E6']
-    t_colors = [c['accent'], red, green, c['primary']]
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig.patch.set_facecolor('white')
+    fig.suptitle(f'{company} SWOT 분석',
+                 fontsize=18, fontweight='bold', y=0.98, color=primary)
 
-    for idx, (title, items) in enumerate(zip(titles, swot.values())):
+    for idx in range(4):
+        title_en, title_kor, bg, header_color, text_color = quadrants[idx]
+        items = swot.get(keys[idx], [])
         row, col = idx // 2, idx % 2
         ax = axes[row][col]
         ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-        ax.set_facecolor(bgs[idx])
-        ax.set_title(title, fontsize=12, fontweight='bold', color=t_colors[idx], pad=10)
-        ax.text(0.05, 0.85, '\n'.join(items), transform=ax.transAxes,
-                fontsize=10.5, verticalalignment='top', linespacing=1.85)
+        ax.set_facecolor(bg)
         ax.set_xticks([]); ax.set_yticks([])
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+        # 4분면 진한 테두리
+        for spine in ax.spines.values():
+            spine.set_edgecolor(header_color)
+            spine.set_linewidth(2.0)
+
+        # 헤더 색상 띠 (상단 13%)
+        ax.add_patch(plt.Rectangle(
+            (0, 0.87), 1, 0.13, transform=ax.transAxes,
+            facecolor=header_color, alpha=0.92, zorder=1, edgecolor='none'))
+        ax.text(0.5, 0.935, f'{title_en}  ({title_kor})',
+                transform=ax.transAxes, ha='center', va='center',
+                fontsize=14, fontweight='bold', color='white', zorder=2)
+
+        # 항목 텍스트: 긴 줄 자동 wrap + 항목 사이 빈 줄
+        wrapped = []
+        for item in items:
+            txt = item.lstrip('•').strip()
+            txt = '•  ' + txt
+            wrapped.append(textwrap.fill(txt, width=30, subsequent_indent='    '))
+        body = '\n\n'.join(wrapped)
+        ax.text(0.05, 0.80, body, transform=ax.transAxes,
+                fontsize=10.5, verticalalignment='top',
+                linespacing=1.5, color=text_color, zorder=2)
+
+    plt.subplots_adjust(left=0.03, right=0.97, top=0.92, bottom=0.03,
+                        wspace=0.08, hspace=0.12)
     _save(fig, out_dir, 'chart8_swot.png')
 
 
