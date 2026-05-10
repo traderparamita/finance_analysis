@@ -1,0 +1,17 @@
+# finance-analysis plugin — Python dependencies
+# Install: pip install -r requirements.txt
+# 또는 가상환경 권장: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+# ── 핵심: 재무 데이터 ──
+yfinance>=0.2.40
+
+# ── PDF 생성 ──
+reportlab>=4.0.0
+
+# ── 차트 생성 ──
+matplotlib>=3.7.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# ── 데이터 처리 (yfinance 의존) ──
+pandas>=2.0.0
