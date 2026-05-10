@@ -4,7 +4,7 @@
   "description": "투자 분석 보고서 자동 생성 플러그인 — finance-report (풀 16~17 페이지) + finance-brief (1~2 페이지 압축). yfinance 실시간 재무 데이터 + WebSearch 이슈 보강 + 15개 표준 차트 + ReportLab PDF.",
   "author": {
     "name": "lifesailor",
-    "email": "malife_ai3@naver.com"
+    "email": "traderparamita@gmail.com"
   },
   "license": "MIT",
   "homepage": "https://github.com/lifesailor/finance-analysis",
