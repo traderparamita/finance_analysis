@@ -20,13 +20,13 @@ Claude Code 플러그인 — 투자 분석 보고서 자동 생성기.
 ### 1) 플러그인 설치
 ```bash
 # Claude Code 안에서
-/plugin marketplace add lifesailor/finance-analysis
-/plugin install finance-analysis@lifesailor
+/plugin marketplace add traderparamita/finance_analysis
+/plugin install finance-analysis@traderparamita
 ```
 
 ### 2) Python 의존성 설치
 ```bash
-git clone https://github.com/lifesailor/finance-analysis.git $HOME/finance-reports
+git clone https://github.com/traderparamita/finance_analysis.git $HOME/finance-reports
 cd $HOME/finance-reports
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt

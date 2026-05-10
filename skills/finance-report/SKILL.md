@@ -4,7 +4,7 @@ description: "투자 분석 보고서 자동 생성 스킬. 주식/크립토/한
 argument-hint: "종목명 또는 '삼성전자 분석 보고서 만들어줘'"
 license: MIT
 metadata:
-  author: lifesailor
+  author: traderparamita
   version: "4.1.0"
 ---
 
