@@ -54,6 +54,8 @@ COMPANIES = {
     '펨트론':       'stocks.pemtron',
     '일본전산':     'stocks.nidec',
     '인터플렉스':   'stocks.인터플렉스',
+    '스노우플레이크': 'stocks.snowflake',
+    'snowflake':    'stocks.snowflake',
 }
 
 
